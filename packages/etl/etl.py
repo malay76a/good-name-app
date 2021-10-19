@@ -1,5 +1,7 @@
 import json
 import os
+
+import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
 from datetime import datetime, timezone
@@ -17,6 +19,7 @@ TABLE_NAME_COO = 'station_coordinates'
 TABLE_NAME_METRICS = 'station_metrics'
 TABLE_NAME_TEMPERATURE = 'out_temperature'
 TABLE_NAME_PROFILE = 'profile_metrics'
+TABLE_NAME_ALERTS = 'incident'
 
 PATH_STATION_COORDINATES = './IN/02_координаты_станций.csv'
 PATH_STATION_METRICS = './IN/01_данные станций'
@@ -25,6 +28,15 @@ PATH_PROFILE = './IN/04_данные_профилемера'
 ssl_args = {'ssl_ca': './credentials/CA.pem'}
 db_connection_str = f"mysql+pymysql://{config['login']}:{config['password']}@{config['hostname']}:{config['port']}/{SCHEMA_RAW}"
 db_connection = create_engine(db_connection_str, connect_args=ssl_args)
+
+ALERT_CONFIG = {
+    'notnull_metrics': ['pressure'],  # > 0
+    'positive_metrics': ['CO', 'NO', 'NO2', 'humidity', 'precipitation', '| V |', '_V_'],  # >= 0
+    'upper_alert': ['pressure', 'CO', 'NO', 'NO2', '| V |'],  # alert on upper percentile
+    'upper_percentiles': [98, 99, 99.9, 100],  # alert on this percentile ranges
+    'lower_alert': ['pressure'],  # alert on lower percentile
+    'lower_percentiles': [0, 0.1, 1, 2]  # alert on this percentile ranges
+}
 
 logging.getLogger().setLevel('INFO')
 
@@ -253,6 +265,92 @@ def update_filtered_profile():
     logging.info('Done!')
 
 
+def get_anomaly(dt_from: datetime, dt_to: datetime):
+    """
+    Get anomalies in station_metrics for specified date range
+    :param dt_from: find anomalies from this date
+    :param dt_to: to this date
+    :return:
+    """
+    query = f"""
+        SELECT report_dt,
+               station_id,
+               metric_name,
+               metric_value
+        FROM {SCHEMA_FILTERED}.{TABLE_NAME_METRICS}
+    """
+    df_all = pd.read_sql(query, con=db_connection)
+    df_window = df_all[(df_all.report_dt > dt_from) & (df_all.report_dt <= dt_to)]
+
+    df_alerts = pd.DataFrame(columns=['report_dt', 'station_id', 'source', 'metric_name', 'metric_value',
+                                      'incident_type', 'incident_level', 'is_alert_send'])
+
+    # TO DO: Проверку целостности данных, как и сверку с ПДК можно вынести в отдельную функцию, ибо не нужен весь датасет
+    # NULL ALERT
+    alert_i = df_window[(df_window.metric_name.isin(ALERT_CONFIG['notnull_metrics'])) & (df_window.metric_value == 0)]
+    alert_i = alert_i.assign(incident_type='null_value', source='station_metrics')
+    logging.info(f'{alert_i.shape[0]} incidents with zero values')
+    df_alerts = df_alerts.append(alert_i)
+
+    # NEGATIVE ALERT
+    alert_i = df_window[(df_window.metric_name.isin(ALERT_CONFIG['positive_metrics'])) &
+                     (df_window.metric_value < 0)]
+    alert_i = alert_i.assign(incident_type='negative_value', source='station_metrics')
+    logging.info(f'{alert_i.shape[0]} incidents with negative values')
+    df_alerts = df_alerts.append(alert_i)
+
+    # TO DO: Проверку, что значения на приборе перестали приходить (но приходили раньше)
+    # PERCENTILE ALERTS
+    df_all = df_all[((df_all.metric_name.isin(ALERT_CONFIG['notnull_metrics'])) & (df_all.metric_value > 0)) |
+                    (df_all.metric_name.isin(ALERT_CONFIG['positive_metrics'])) & (df_all.metric_value >= 0)].copy()
+
+    # upper percentile
+    for metric_i in ALERT_CONFIG['upper_alert']:
+        df_all_segment = df_all[df_all.metric_name == metric_i].copy()
+
+        percentiles_vals = [np.percentile(df_all_segment.metric_value.sort_values().to_list(), p)
+                            for p in ALERT_CONFIG['upper_percentiles']]
+
+        alert_i = pd.DataFrame()
+        for p in range(len(percentiles_vals) - 1):
+            alert_p_i = df_window[(df_window.metric_name == metric_i) &
+                                  (df_window.metric_value > percentiles_vals[p]) &
+                                  (df_window.metric_value <= percentiles_vals[p + 1])]
+            alert_p_i = alert_p_i.assign(
+                incident_type=f"{ALERT_CONFIG['upper_percentiles'][p]}-{ALERT_CONFIG['upper_percentiles'][p + 1]}_percentile_value",
+                source='station_metrics')
+            alert_i = alert_i.append(alert_p_i)
+        logging.info(f'{alert_i.shape[0]} incidents with upper percentile')
+        df_alerts = df_alerts.append(alert_i)
+
+    # lower percentile
+    for metric_i in ALERT_CONFIG['lower_alert']:
+        df_all_segment = df_all[df_all.metric_name == metric_i].copy()
+
+        percentiles_vals = [np.percentile(df_all_segment.metric_value.sort_values().to_list(), p)
+                            for p in ALERT_CONFIG['lower_percentiles']]
+
+        alert_i = pd.DataFrame()
+        for p in range(len(percentiles_vals) - 1):
+            alert_p_i = df_window[(df_window.metric_name == metric_i) &
+                                  (df_window.metric_value >= percentiles_vals[p]) &
+                                  (df_window.metric_value < percentiles_vals[p + 1])]
+            alert_p_i = alert_p_i.assign(
+                incident_type=f"{ALERT_CONFIG['lower_percentiles'][p]}-{ALERT_CONFIG['lower_percentiles'][p + 1]}_percentile_value",
+                source='station_metrics')
+            alert_i = alert_i.append(alert_p_i)
+        logging.info(f'{alert_i.shape[0]} incidents with lower percentile')
+        df_alerts = df_alerts.append(alert_i)
+
+    df_alerts = df_alerts.assign(
+        created_at=datetime.now(tz=timezone.utc),
+        updated_at=datetime.now(tz=timezone.utc),
+        is_alert_send=False
+    )
+
+    df_to_pg(df_alerts, TABLE_NAME_ALERTS, SCHEMA_PROD, pk='clear table', engine=db_connection)
+
+
 def main():
     upload_coordinates(PATH_STATION_COORDINATES)
     upload_station_metrics(PATH_STATION_METRICS)
@@ -261,6 +359,8 @@ def main():
     update_prod_station()
     update_filtered_metrics()
     update_filtered_profile()
+
+    get_anomaly(datetime(2020, 11, 1), datetime(2020, 11, 15))
 
 
 if __name__ == "__main__":
