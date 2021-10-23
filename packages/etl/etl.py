@@ -1,37 +1,47 @@
 import json
+import logging
 import os
-
-import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
-from datetime import datetime, timezone
-
+from datetime import datetime, timezone, timedelta
+from scipy.optimize import minimize
 from tools import *
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# SOURCES
+# ----------------------------------------------------------------------------------------------------------------------
+# db credentials {"hostname": "***", "port":"", "login":, "password":""}
 with open('./credentials/mysql_user.json', encoding="utf8") as file:
     config = json.load(file)
+ssl_args = {'ssl_ca': './credentials/CA.pem'}
 
+# paths to source data
+PATH_STATION_COORDINATES = './IN/02_координаты_станций.csv'
+PATH_STATION_METRICS = './IN/01_данные станций'
+PATH_PROFILE = './IN/04_данные_профилемера'
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# CONFIG
+# ----------------------------------------------------------------------------------------------------------------------
 SCHEMA_RAW = 'raw'
 SCHEMA_FILTERED = 'filtered'
 SCHEMA_PROD = 'production'
 TABLE_NAME_COO = 'station_coordinates'
 TABLE_NAME_METRICS = 'station_metrics'
+TABLE_NAME_METRICS_ML = 'station_metrics_ml'
 TABLE_NAME_TEMPERATURE = 'out_temperature'
 TABLE_NAME_PROFILE = 'profile_metrics'
-TABLE_NAME_ALERTS = 'incident'
+TABLE_NAME_ALERTS = 'incidents'
 
-PATH_STATION_COORDINATES = './IN/02_координаты_станций.csv'
-PATH_STATION_METRICS = './IN/01_данные станций'
-PATH_PROFILE = './IN/04_данные_профилемера'
-
-ssl_args = {'ssl_ca': './credentials/CA.pem'}
 db_connection_str = f"mysql+pymysql://{config['login']}:{config['password']}@{config['hostname']}:{config['port']}/{SCHEMA_RAW}"
 db_connection = create_engine(db_connection_str, connect_args=ssl_args)
 
+# conditions to raise incident
 ALERT_CONFIG = {
-    'notnull_metrics': ['pressure'],  # > 0
-    'positive_metrics': ['CO', 'NO', 'NO2', 'humidity', 'precipitation', '| V |', '_V_'],  # >= 0
+    'notnull_metrics': ['pressure'],  # alert if metric <= 0
+    'positive_metrics': ['CO', 'NO', 'NO2', 'humidity', 'precipitation', '| V |', '_V_'],  # alert if metric < 0
     'upper_alert': ['pressure', 'CO', 'NO', 'NO2', '| V |'],  # alert on upper percentile
     'upper_percentiles': [98, 99, 99.9, 100],  # alert on this percentile ranges
     'lower_alert': ['pressure'],  # alert on lower percentile
@@ -41,6 +51,9 @@ ALERT_CONFIG = {
 logging.getLogger().setLevel('INFO')
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# PIPELINE
+# ----------------------------------------------------------------------------------------------------------------------
 def upload_coordinates(path_to_file):
     """
     Upload stations coordinates to db
@@ -65,7 +78,9 @@ def upload_station_metrics(path_to_directory):
         'PM25': 'PM2.5',
         'Давление': 'pressure',
         'Влажность': 'humidity',
-        'Осадки': 'precipitation'
+        'Осадки': 'precipitation',
+        'Направление ветра': '_V_',
+        'Скорость ветра': '| V |'
     }
 
     df_station_metrics = pd.DataFrame()
@@ -75,8 +90,11 @@ def upload_station_metrics(path_to_directory):
         if file_extension not in ['.xlsx', '.xls']:
             logging.info('Not a Excel file. Skipping...')
             continue
-        engine_excel = 'openpyxl' if file_extension == '.xlsx' else None
-        df_input_i = pd.read_excel(os.path.join(path_to_directory, filename), engine=engine_excel)
+        if filename == 'Высотный пункт 253 м ветер.xls':
+            df_input_i = pd.read_excel(os.path.join(PATH_STATION_METRICS, filename), engine=None, skiprows=1)
+            df_input_i.rename(columns={'Unnamed: 0': 'report_dt'}, inplace=True)
+        else:
+            df_input_i = pd.read_excel(os.path.join(PATH_STATION_METRICS, filename), engine='openpyxl')
 
         df_input_i = df_input_i[list(filter(lambda x: 'Unnamed' not in x, df_input_i.columns))]
         df_input_i = df_input_i.rename(columns=renames).set_index('report_dt')
@@ -265,13 +283,16 @@ def update_filtered_profile():
     logging.info('Done!')
 
 
-def get_anomaly(dt_from: datetime, dt_to: datetime):
+def define_anomaly(dt_from: datetime, dt_to: datetime):
     """
     Get anomalies in station_metrics for specified date range
     :param dt_from: find anomalies from this date
     :param dt_to: to this date
     :return:
     """
+    logging.info(f'Defining anomalies in range {dt_from} - {dt_to}')
+
+    logging.info('Getting data from filtered...')
     query = f"""
         SELECT report_dt,
                station_id,
@@ -351,6 +372,185 @@ def get_anomaly(dt_from: datetime, dt_to: datetime):
     df_to_pg(df_alerts, TABLE_NAME_ALERTS, SCHEMA_PROD, pk='clear table', engine=db_connection)
 
 
+def get_predictions(metric_name, only_future=True):
+    """
+    Predict metric_value for all stations for metric_name
+    :param metric_name: what metric to predict
+    :param only_future: write to database only future prediction
+    result inserted to database
+    """
+    logging.info(f'Getting predictions for all stations for metric {metric_name}')
+    n_preds = 72  # 24 hours
+
+    # Get data
+    df = pd.read_sql(f"""
+        SELECT *
+        FROM {SCHEMA_FILTERED}.{TABLE_NAME_METRICS}
+        WHERE metric_name = '{metric_name}'
+            AND metric_value IS NOT NULL
+    """, con=db_connection)
+
+    # Filter incorrect values
+    if metric_name in ALERT_CONFIG['notnull_metrics']:
+        df = df[df.metric_value > 0].copy()
+    if metric_name in ALERT_CONFIG['positive_metrics']:
+        df = df[df.metric_value >= 0].copy()
+
+    for station_id in df.station_id.unique(): #TODO скипать если пусто
+        logging.info(f'Station #{station_id}')
+        df_i = df[df.station_id == station_id].set_index('report_dt').copy()
+        data = df_i[:-int(n_preds/2)].metric_value.copy()
+        # initializing model parameters alpha, beta and gamma
+        x = [0, 0, 0]
+    
+        logging.info('Minimizing the loss function')
+        opt = minimize(timeseriesCVscore, x0=x,
+                       args=(data, mean_absolute_percentage_error),
+                       method="TNC", bounds=((0, 1), (0, 1), (0, 1))
+                       )
+    
+        # Take optimal values...
+        alpha_final, beta_final, gamma_final = opt.x
+        logging.info(f'alpha: {alpha_final}, beta: {beta_final}, gamma: {gamma_final}')
+    
+        logging.info('Training the model')
+        model = HoltWinters(data, slen=26000, #TODO - определять до
+                            alpha=alpha_final,
+                            beta=beta_final,
+                            gamma=gamma_final,
+                            n_preds=n_preds+int(n_preds/2), scaling_factor=3)
+        model.triple_exponential_smoothing()
+    
+        df_result = pd.DataFrame(model.result, columns=['metric_value_ml']) \
+            .merge(df_i.reset_index(), how='left', left_index=True, right_index=True)
+    
+        dates = list(df_result[~df_result.report_dt.isnull()].report_dt)
+        future_dates = [
+            df_result.report_dt.max() + (i + 20) * timedelta(minutes=20)
+            for i in range(df_result[df_result.report_dt.isnull()].shape[0])
+        ]
+        dates.extend(future_dates)
+        df_result['report_dt_pred'] = dates
+        df_result[['station_id', 'metric_name']] = [station_id, metric_name]
+    
+        if only_future:
+            df_result = df_result[df_result.report_dt.isnull()]
+        df_result = df_result[['report_dt_pred', 'station_id', 'metric_name', 'metric_value_ml']] \
+            .rename(columns={'report_dt_pred': 'report_dt'})
+    
+        df_result['created_at'] = datetime.now(tz=timezone.utc)
+        df_to_pg(df_result, TABLE_NAME_METRICS_ML, SCHEMA_FILTERED, pk=None, engine=db_connection)
+    logging.info('Done!')
+
+
+def update_prod():
+    """
+    Insert to production new data and predictions
+    """
+    logging.info('Updating production')
+
+    logging.info('Station metrics')
+    query_delete_metric = f"""
+        DELETE FROM {SCHEMA_PROD}.{TABLE_NAME_METRICS}
+        WHERE fl_ml = 0
+    """
+    query_delete_metric_ml = f"""
+        DELETE FROM {SCHEMA_PROD}.{TABLE_NAME_METRICS}
+        WHERE fl_ml = 1
+    """
+    query_metrics = f"""
+        INSERT INTO {SCHEMA_PROD}.{TABLE_NAME_METRICS}
+        (report_dt, station_id, metric_name, metric_value, created_at, prediction_created_at, fl_ml)
+        SELECT filt.report_dt ,
+                filt.station_id ,
+                filt.metric_name ,
+                filt.metric_value ,
+                CONVERT_TZ(NOW(),'SYSTEM','UTC') AS created_at ,
+                NULL AS prediction_created_at ,
+                0 AS fl_ml
+        FROM {SCHEMA_FILTERED}.{TABLE_NAME_METRICS} filt
+        """
+    query_metrics_ml = f"""
+        INSERT INTO {SCHEMA_PROD}.{TABLE_NAME_METRICS}
+        (report_dt, station_id, metric_name, metric_value, created_at, prediction_created_at, fl_ml)
+        SELECT ml.report_dt ,
+                ml.station_id ,
+                ml.metric_name ,
+                ml.metric_value_ml AS metric_value,
+                CONVERT_TZ(NOW(),'SYSTEM','UTC') AS created_at ,
+                ml.created_at AS prediction_created_at ,
+                1 AS fl_ml
+        FROM {SCHEMA_FILTERED}.{TABLE_NAME_METRICS_ML} ml
+    """
+    with db_connection.connect() as con:
+        # result = con.execute(query_delete_metric)
+        # logging.info(f"Deleted {result.rowcount} rows")
+        #
+        # result = con.execute(query_metrics)
+        # logging.info(f"Inserted {result.rowcount} rows")
+
+        result = con.execute(query_delete_metric_ml)
+        logging.info(f"Deleted {result.rowcount} rows")
+
+        result = con.execute(query_metrics_ml)
+        logging.info(f"Inserted {result.rowcount} rows")
+    logging.info('Station updated')
+
+
+    return
+    logging.info('Profile metrics')
+    query_delete_profile = f"""
+        DELETE FROM {SCHEMA_PROD}.{TABLE_NAME_PROFILE}
+        WHERE fl_ml = 0
+    """
+    query_profile = f"""
+        INSERT INTO {SCHEMA_PROD}.{TABLE_NAME_PROFILE}
+        (report_dt, station_id, altitude, temperature, created_at, prediction_created_at, fl_ml)
+        SELECT filt.report_dt ,
+                filt.station_id ,
+                filt.altitude ,
+                filt.temperature ,
+                CONVERT_TZ(NOW(),'SYSTEM','UTC') AS created_at ,
+                NULL AS prediction_created_at ,
+                0 AS fl_ml
+        FROM {SCHEMA_FILTERED}.{TABLE_NAME_PROFILE} filt
+        """
+    with db_connection.connect() as con:
+        result = con.execute(query_delete_profile)
+        logging.info(f"Deleted {result.rowcount} rows")
+
+        result = con.execute(query_profile)
+        logging.info(f"Inserted {result.rowcount} rows")
+    logging.info('Profile metrics updated')
+
+    logging.info('Out temperature')
+    query_delete_out_temp = f"""
+        DELETE FROM {SCHEMA_PROD}.{TABLE_NAME_TEMPERATURE}
+        WHERE fl_ml = 0
+    """
+    query_out_temp = f"""
+        INSERT INTO {SCHEMA_PROD}.{TABLE_NAME_TEMPERATURE}
+        (report_dt, station_id, outside_temperature, quality, created_at, prediction_created_at, fl_ml)
+        SELECT filt.report_dt ,
+                filt.station_id ,
+                filt.outside_temperature ,
+                filt.quality ,
+                CONVERT_TZ(NOW(),'SYSTEM','UTC') AS created_at ,
+                NULL AS prediction_created_at ,
+                0 AS fl_ml 
+        FROM {SCHEMA_FILTERED}.{TABLE_NAME_TEMPERATURE} filt
+        """
+    with db_connection.connect() as con:
+        result = con.execute(query_delete_out_temp)
+        logging.info(f"Deleted {result.rowcount} rows")
+
+        result = con.execute(query_out_temp)
+        logging.info(f"Inserted {result.rowcount} rows")
+    logging.info('Out temperature updated')
+
+    logging.info('Done!')
+
+
 def main():
     upload_coordinates(PATH_STATION_COORDINATES)
     upload_station_metrics(PATH_STATION_METRICS)
@@ -360,9 +560,12 @@ def main():
     update_filtered_metrics()
     update_filtered_profile()
 
-    get_anomaly(datetime(2020, 11, 1), datetime(2020, 11, 15))
+    define_anomaly(datetime(2020, 11, 1), datetime(2020, 11, 15))
+
+    get_predictions('pressure')
+
+    update_prod()
 
 
 if __name__ == "__main__":
     main()
-
