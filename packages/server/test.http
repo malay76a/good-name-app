@@ -1,0 +1,11 @@
+### GET request with a header
+GET http://localhost:3000/indicators
+Accept: application/json
+
+###
+GET http://localhost:3000/stantions
+Accept: application/json
+
+###
+GET http://localhost:3000/data?test=1
+Accept: application/json
