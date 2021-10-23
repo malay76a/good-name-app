@@ -1,0 +1,6 @@
+pandas
+sqlalchemy
+json
+pymysql
+openpyxl
+xlrd
