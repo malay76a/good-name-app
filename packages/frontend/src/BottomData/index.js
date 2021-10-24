@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useContext, useState, useCallback } from 'react';
 import cn from 'classnames';
+
 import { ReactComponent as Icon } from './Vector.svg';
+import { AppContext } from '../App';
 
 import './BottomCard.css';
 
 function BottomData() {
   const [open, setOpen] = useState(false);
-
+  const { polutionType, stations, indicators } = useContext(AppContext);
   const toggleText = open ? '' : 'Смотреть результаты по всем станциям';
 
   return (
@@ -25,7 +27,9 @@ function BottomData() {
         />
       </button>
 
-      <div className="BottomModal">asd</div>
+      <div className="BottomModal">
+        
+      </div>
     </div>
   );
 }
