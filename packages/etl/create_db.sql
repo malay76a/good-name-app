@@ -141,3 +141,7 @@ CREATE TABLE production.incident (
     created_at TIMESTAMP,
     updated_at TIMESTAMP
 );
+
+INSERT INTO raw.station_coordinates
+(station_name, created_at)
+VALUES('Высотный пункт 253 м ветер', CONVERT_TZ(NOW(),'SYSTEM','UTC'));

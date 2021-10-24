@@ -4,3 +4,5 @@ json
 pymysql
 openpyxl
 xlrd
+scipy
+sklearn
