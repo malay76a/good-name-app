@@ -7,7 +7,7 @@ GET http://localhost:3000/stantions
 Accept: application/json
 
 ###
-GET http://localhost:3000/data?test=1
+GET http://localhost:3000/data?time=2020-12-28T20:10:00.000Z
 Accept: application/json
 
 ###
