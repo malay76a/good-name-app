@@ -29,7 +29,10 @@ function PolutionList({ stationId, name, ...context }) {
           return (
             <li key={index}>
               <Dot status={getStatus(indicator.PDK, dataItem.metric_value)} />{' '}
-              {indicator?.metric_name} - {indicator?.metric_name_ru}
+              <span style={{ fontWeight: 'bold' }}>
+                {indicator?.metric_name}
+              </span>{' '}
+              - {indicator?.metric_name_ru}
             </li>
           );
         })}
