@@ -40,9 +40,12 @@ function BottomData() {
             stations.map((station) => {
               const { name, id } = station;
               return (
-                <div key={name} className={'BottomModalItem'}>
-                  <PolutionList stationId={id} {...context} name={name} />
-                </div>
+                <PolutionList
+                  key={name}
+                  stationId={id}
+                  {...context}
+                  name={name}
+                />
               );
             })}
         </div>

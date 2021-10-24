@@ -55,7 +55,6 @@ function YaMap() {
       });
       myMap.geoObjects.add(place);
     });
-    console.log('geoObjects', myMap.geoObjects);
 
     myMap.events.add('click', function (e) {
       if (myMap.baloon?.isOpen()) myMap.baloon.close();
@@ -66,7 +65,6 @@ function YaMap() {
       const markup = ReactDOMServer.renderToStaticMarkup(
         <PolutionList stationId={id} {...context} />
       );
-console.log(markup, context);
       myMap.balloon.open(currentCoords, {
         contentHeader: name,
         contentBody: markup,

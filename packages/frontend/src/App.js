@@ -23,7 +23,7 @@ const getFetchData = (path, callback) => {
 
 function App() {
   const [station, setStation] = useState('');
-  const [polutionType, setPolutionType] = useState('NO');
+  const [polutionType, setPolutionType] = useState('');
   const [data, setData] = useState([]);
   const [indicators, setIndicators] = useState([]);
   const [stations, setStations] = useState([]);
