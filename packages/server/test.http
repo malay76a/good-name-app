@@ -25,3 +25,7 @@ Accept: application/json
 ###
 GET http://localhost:3004/timeline
 Accept: application/json
+
+###
+GET http://localhost:3004/pdk
+Accept: application/json
