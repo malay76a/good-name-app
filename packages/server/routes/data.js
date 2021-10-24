@@ -1,21 +1,16 @@
 const db = require("../db");
 
 module.exports = function (req, res) {
-
-
+    const {time, stantion_id, metric_name} = res.query;
+    // console.log(res.query)
 
     db
         .promise()
-        .query(`SELECT DISTINCT report_dt FROM filtered.station_metrics ORDER BY report_dt DESC LIMIT 432`)
+        .query(`SELECT * 
+                    FROM filtered.station_metrics 
+                    WHERE report_dt = ${time}
+                    ORDER BY report_dt DESC`)
         .then(([rows]) => {
-            // const preparedData = rows.map(i => {
-            //     return {
-            //         id: i.id,
-            //         name: i['station_name'].trim(),
-            //         latitude: parseFloat(i.latitude),
-            //         longitude: parseFloat(i.longitude),
-            //     }
-            // })
             res.setHeader('Content-Type', 'application/json');
             res.send(JSON.stringify(rows))
         })
@@ -26,48 +21,11 @@ module.exports = function (req, res) {
         });
 }
 
-// /data:
-//     get:
-//       summary: 'Возвращает данные по станциям, времени и веществам'
-//       parameters:
-//         - name: stantion_id
-//           in: query
-//           description: ID станции
-//           required: false
-//           schema:
-//             type: integer
-//             format: int64
-//         - name: time
-//           in: query
-//           description: время в UTC
-//           required: false
-//           schema:
-//             type: integer
-//             format: int64
-//         - name: indicator_id
-//           in: query
-//           description: ID вещества
-//           required: false
-//           schema:
-//             type: integer
-//             format: int64
-//       responses:
-//         '200':
-//           description: 'Запрос за данными таймлайна'
-//           content:
-//             application/json:
-//               schema:
-//                 type: object
-//                 properties:
-//                   stantion:
-//                     type: object
-//                     properties:
-//                       id:
-//                         type: integer
-//                         format: int64
-//                       time:
-//                         type: integer
-//                         format: int64
-//                       data:
-//                         type: array
-//                         $ref: '#/components/schemas/Indicator'
+
+// {
+//     "report_dt": "2020-12-31T18:00:00.000Z",
+//     "station_id": 1,
+//     "metric_name": "CO",
+//     "metric_value": 0.5,
+//     "created_at": "2021-10-23T08:09:47.000Z"
+// }
