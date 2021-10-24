@@ -31,22 +31,21 @@ function BottomData() {
       </button>
 
       <div
-        className="BottomModal"
-        style={{
-          height: open ? 'auto' : 0,
-          visibility: open ? 'visible' : 'hidden',
-          maxHeight: 400,
-        }}
+        className={cn('BottomModal', {
+          'BottomModal-open': open,
+        })}
       >
-        {open &&
-          stations.map((station) => {
-            const { name, id } = station;
-            return (
-              <div key={name}>
-                <PolutionList stationId={id} {...context} name={name}/>
-              </div>
-            );
-          })}
+        <div className="BottomModalList">
+          {open &&
+            stations.map((station) => {
+              const { name, id } = station;
+              return (
+                <div key={name} className={'BottomModalItem'}>
+                  <PolutionList stationId={id} {...context} name={name} />
+                </div>
+              );
+            })}
+        </div>
       </div>
     </div>
   );

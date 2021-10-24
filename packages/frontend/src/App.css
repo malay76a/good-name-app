@@ -9,10 +9,6 @@
   font-size: 16px;
   line-height: 19px;
 }
-
-.App-link {
-  color: #61dafb;
-}
  
 .App-map-wrapper{
   height: 100vh;
@@ -47,6 +43,6 @@
 font-style: normal;
 font-weight: bold;
 font-size: 16px;
-line-height: 19px;
+ 
 margin-bottom: 8px;
 }
