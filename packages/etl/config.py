@@ -30,3 +30,8 @@ ALERT_CONFIG = {
     'lower_alert': ['pressure'],  # alert on lower percentile
     'lower_percentiles': [0, 0.1, 1, 2]  # alert on this percentile ranges
 }
+
+# stations that not in "02_координаты_станций.csv"
+EXTRA_STATIONS = {
+    'station_name': 'Высотный пункт 253 м ветер'
+}

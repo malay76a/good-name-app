@@ -4,24 +4,24 @@ logging.getLogger().setLevel('INFO')
 
 
 def main():
-    ## Загрузка сырых данных
+    # Загрузка сырых данных
     upload_coordinates(PATH_STATION_COORDINATES)
     upload_station_metrics(PATH_STATION_METRICS)
     upload_profile(PATH_PROFILE)
 
-    ## Обработка входных данных
+    # Обработка входных данных
     update_prod_station()
     update_filtered_metrics()
     update_filtered_profile()
 
-    ## Определение аномалий
+    # Определение аномалий
     define_anomaly(datetime(2020, 11, 1), datetime(2020, 11, 15))
 
-    ## Получить предсказания
+    # Получить предсказания
     for metric_name in ['CO', 'NO', 'NO2', 'PM2.5', 'PM10']:
         get_predictions(metric_name)
 
-    ## Обновить продакшн
+    # Обновить продакшн
     update_prod()
 
 

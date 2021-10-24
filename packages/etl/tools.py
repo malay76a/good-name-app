@@ -274,6 +274,7 @@ def upload_coordinates(path_to_file):
     logging.info('Processing station coordinates')
     df_coor = pd.read_csv(path_to_file, delimiter=';', header=None,
                           names=['station_name', 'latitude', 'longitude'], dtype=str)
+    df_coor = df_coor.append(EXTRA_STATIONS, ignore_index=True)
     df_coor['created_at'] = datetime.now(tz=timezone.utc)
     df_to_pg(df_coor, TABLE_NAME_COO, SCHEMA_RAW, pk='clear table', engine=db_connection)
     logging.info('Done!')
@@ -325,6 +326,7 @@ def upload_station_metrics(path_to_directory):
     df_station_metrics['created_at'] = datetime.now(tz=timezone.utc)
 
     # Parse dates, convert timestamp to UTC timezone
+    logging.info('Parsing...')
     dates1 = pd.to_datetime(df_station_metrics.report_dt, format='%d/%m/%Y %H:%M', errors='coerce')
     dates2 = pd.to_datetime(df_station_metrics.report_dt, errors='coerce')
     df_station_metrics['report_dt_parsed'] = dates1.combine_first(dates2)
@@ -350,8 +352,8 @@ def upload_profile(path_to_directory):
 
     for filename in os.listdir(path_to_directory):
         logging.info(f'Parsing file {filename}')
-        with open(os.path.join(path_to_directory, filename), 'r') as file:
-            lines = file.readlines()
+        with open(os.path.join(path_to_directory, filename), 'r') as f:
+            lines = f.readlines()
 
             # Find key line index
             for index, line in enumerate(lines):
@@ -398,7 +400,7 @@ def upload_profile(path_to_directory):
     df_out_temperature['created_at'] = datetime.now(tz=timezone.utc)
     df_profile['created_at'] = datetime.now(tz=timezone.utc)
 
-    # profiler sourse. In DEMO we have only Останкино.
+    # profiler source. In DEMO we have only Останкино.
     df_out_temperature['source'] = 'Останкино'
     df_profile['source'] = 'Останкино'
 
@@ -430,7 +432,8 @@ def update_prod_station():
     """
 
     with db_connection.connect() as con:
-        con.execute(query)
+        result = con.execute(query)
+        logging.info(f"Inserted {result.rowcount} rows")
 
     logging.info('Done!')
 
@@ -445,11 +448,9 @@ def update_filtered_metrics():
 
     logging.info('Getting data from raw...')
     station_ids = pd.read_sql(f'SELECT station_name, id FROM {SCHEMA_PROD}.{TABLE_NAME_COO}', con=db_connection)
-    df_metric = pd.read_sql(f'SELECT * FROM {SCHEMA_RAW}.{TABLE_NAME_METRICS}',
-                            con=db_connection)  # TO DO: update only new rows
+    df_metric = pd.read_sql(f'SELECT * FROM {SCHEMA_RAW}.{TABLE_NAME_METRICS}', con=db_connection)
 
     # Mapping
-
     logging.info('Mapping stations...')
     station_ids['station_name'] = station_ids['station_name'].str.lower()
     station_ids = {i['station_name']: i['id'] for _, i in station_ids.iterrows()}  # {station_name: id}
@@ -476,8 +477,7 @@ def update_filtered_profile():
 
     logging.info('Getting data from raw...')
     station_ids = pd.read_sql(f'SELECT station_name, id FROM {SCHEMA_PROD}.{TABLE_NAME_COO}', con=db_connection)
-    df_profile = pd.read_sql(f'SELECT * FROM {SCHEMA_RAW}.{TABLE_NAME_PROFILE}',
-                             con=db_connection)  # TO DO: update only new rows
+    df_profile = pd.read_sql(f'SELECT * FROM {SCHEMA_RAW}.{TABLE_NAME_PROFILE}', con=db_connection)
     df_temperature = pd.read_sql(f'SELECT * FROM {SCHEMA_RAW}.{TABLE_NAME_TEMPERATURE}', con=db_connection)
 
     # Mapping
@@ -671,22 +671,19 @@ def get_predictions(metric_name, only_future=True):
     logging.info('Done!')
 
 
-def update_prod():
+def update_prod(update_actual=True, update_predictions=True):
     """
-    Insert to production new data and predictions
+    Insert to production new data and predictions for all dates
     """
+    if not update_actual and not update_predictions:
+        logging.warning('Set at least one of params update_actual|update_predictions as True')
+        return
     db_connection = get_connection()
-    logging.info('Updating production')
+    logging.info('UPDATING PRODUCTION station metrics!')
 
     logging.info('Station metrics')
-    query_delete_metric = f"""
-        DELETE FROM {SCHEMA_PROD}.{TABLE_NAME_METRICS}
-        WHERE fl_ml = 0
-    """
-    query_delete_metric_ml = f"""
-        DELETE FROM {SCHEMA_PROD}.{TABLE_NAME_METRICS}
-        WHERE fl_ml = 1
-    """
+    query_delete_metric = f"""DELETE FROM {SCHEMA_PROD}.{TABLE_NAME_METRICS} WHERE fl_ml = 0"""
+    query_delete_metric_ml = f"""DELETE FROM {SCHEMA_PROD}.{TABLE_NAME_METRICS} WHERE fl_ml = 1"""
     query_metrics = f"""
         INSERT INTO {SCHEMA_PROD}.{TABLE_NAME_METRICS}
         (report_dt, station_id, metric_name, metric_value, created_at, prediction_created_at, fl_ml)
@@ -712,24 +709,22 @@ def update_prod():
         FROM {SCHEMA_FILTERED}.{TABLE_NAME_METRICS_ML} ml
     """
     with db_connection.connect() as con:
-        # result = con.execute(query_delete_metric)
-        # logging.info(f"Deleted {result.rowcount} rows")
-        #
-        # result = con.execute(query_metrics)
-        # logging.info(f"Inserted {result.rowcount} rows")
+        if update_actual:
+            logging.info('Updating actual data')
+            result = con.execute(query_delete_metric)
+            logging.info(f"Deleted {result.rowcount} rows")
+            result = con.execute(query_metrics)
+            logging.info(f"Inserted {result.rowcount} rows")
 
-        result = con.execute(query_delete_metric_ml)
-        logging.info(f"Deleted {result.rowcount} rows")
-
-        result = con.execute(query_metrics_ml)
-        logging.info(f"Inserted {result.rowcount} rows")
-    logging.info('Station updated')
+        if update_predictions:
+            logging.info('Updating predicted data')
+            result = con.execute(query_delete_metric_ml)
+            logging.info(f"Deleted {result.rowcount} rows")
+            result = con.execute(query_metrics_ml)
+            logging.info(f"Inserted {result.rowcount} rows")
 
     logging.info('Profile metrics')
-    query_delete_profile = f"""
-        DELETE FROM {SCHEMA_PROD}.{TABLE_NAME_PROFILE}
-        WHERE fl_ml = 0
-    """
+    query_delete_profile = f"""DELETE FROM {SCHEMA_PROD}.{TABLE_NAME_PROFILE} WHERE fl_ml = 0"""
     query_profile = f"""
         INSERT INTO {SCHEMA_PROD}.{TABLE_NAME_PROFILE}
         (report_dt, station_id, altitude, temperature, created_at, prediction_created_at, fl_ml)
@@ -743,18 +738,18 @@ def update_prod():
         FROM {SCHEMA_FILTERED}.{TABLE_NAME_PROFILE} filt
         """
     with db_connection.connect() as con:
-        result = con.execute(query_delete_profile)
-        logging.info(f"Deleted {result.rowcount} rows")
+        if update_actual:
+            logging.info('Updating actual data')
+            result = con.execute(query_delete_profile)
+            logging.info(f"Deleted {result.rowcount} rows")
+            result = con.execute(query_profile)
+            logging.info(f"Inserted {result.rowcount} rows")
 
-        result = con.execute(query_profile)
-        logging.info(f"Inserted {result.rowcount} rows")
-    logging.info('Profile metrics updated')
+        if update_predictions:
+            pass
 
     logging.info('Out temperature')
-    query_delete_out_temp = f"""
-        DELETE FROM {SCHEMA_PROD}.{TABLE_NAME_TEMPERATURE}
-        WHERE fl_ml = 0
-    """
+    query_delete_out_temp = f"""DELETE FROM {SCHEMA_PROD}.{TABLE_NAME_TEMPERATURE} WHERE fl_ml = 0"""
     query_out_temp = f"""
         INSERT INTO {SCHEMA_PROD}.{TABLE_NAME_TEMPERATURE}
         (report_dt, station_id, outside_temperature, quality, created_at, prediction_created_at, fl_ml)
@@ -768,12 +763,15 @@ def update_prod():
         FROM {SCHEMA_FILTERED}.{TABLE_NAME_TEMPERATURE} filt
         """
     with db_connection.connect() as con:
-        result = con.execute(query_delete_out_temp)
-        logging.info(f"Deleted {result.rowcount} rows")
+        if update_actual:
+            logging.info('Updating actual data')
+            result = con.execute(query_delete_out_temp)
+            logging.info(f"Deleted {result.rowcount} rows")
+            result = con.execute(query_out_temp)
+            logging.info(f"Inserted {result.rowcount} rows")
 
-        result = con.execute(query_out_temp)
-        logging.info(f"Inserted {result.rowcount} rows")
-    logging.info('Out temperature updated')
+        if update_predictions:
+            pass
 
     logging.info('Done!')
 
