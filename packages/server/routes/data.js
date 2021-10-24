@@ -1,9 +1,12 @@
 const db = require("../db");
 
 module.exports = function (req, res) {
+
+
+
     db
         .promise()
-        .query(`SELECT * FROM filtered.station_metrics ORDER BY station_id DESC LIMIT 10`)
+        .query(`SELECT DISTINCT report_dt FROM filtered.station_metrics ORDER BY report_dt DESC LIMIT 432`)
         .then(([rows]) => {
             // const preparedData = rows.map(i => {
             //     return {
