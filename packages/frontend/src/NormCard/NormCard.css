@@ -1,6 +1,8 @@
 .NormCard{
   top: 20px;
   left: 20px;
+  font-size: 16px;
+  line-height: 19px;
 }
 
 .NormCard-list{

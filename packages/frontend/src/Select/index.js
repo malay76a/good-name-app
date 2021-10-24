@@ -1,8 +1,8 @@
-// import cn from 'classnames';
-import { useState, useEffect, useCallback } from 'react';
-
+import { useContext, useState, useEffect, useCallback } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import SwiperCore, { Navigation } from 'swiper';
+
+import { AppContext } from '../App';
 
 import './Select.css';
 
@@ -12,6 +12,7 @@ function SelectComponent() {
   const [value, setValue] = useState('');
   const [open, setOpen] = useState(false);
   const [swiper, setSwiper] = useState(null);
+  const { polutionType, setPolutionType, indicators } = useContext(AppContext);
 
   const slideTo = useCallback((index) => swiper.slideTo(index), [swiper]);
 
@@ -22,9 +23,14 @@ function SelectComponent() {
     }
   }, [swiper, value, slideTo]);
 
+  const allIndicators = [
+    { metric_name: '', metric_name_ru: 'Все показатели' },
+  ].concat(indicators);
+
   const handleChange = (value) => {
-    setValue(value);
+    setValue(value+1);
     setOpen(false);
+    setPolutionType(allIndicators[value].metric_name);
   };
   const onSlideClick = () => setOpen(true);
 
@@ -39,17 +45,35 @@ function SelectComponent() {
           className="mySwiper"
           onSwiper={setSwiper}
           simulateTouch={false}
+          onSlideChange={(e) => {
+            handleChange(e.realIndex);
+          }}
         >
-          <SwiperSlide onClick={onSlideClick}>Slide 1</SwiperSlide>
-          <SwiperSlide onClick={onSlideClick}>Slide 2</SwiperSlide>
-          <SwiperSlide onClick={onSlideClick}>Slide 3</SwiperSlide>
-          <SwiperSlide onClick={onSlideClick}>Slide 4</SwiperSlide>
+          {allIndicators.map((item, index) => {
+            return (
+              <SwiperSlide key={index} onClick={onSlideClick}>
+                {item.metric_name_ru}
+              </SwiperSlide>
+            );
+          })}
         </Swiper>
       </div>
       <ul className={'List'} style={{ display: open ? 'block' : 'none' }}>
-        <li onClick={() => handleChange(1)}>1</li>
-        <li onClick={() => handleChange(2)}>2</li>
-        <li onClick={() => handleChange(3)}>3</li>
+        {allIndicators.map((item, index) => {
+          return (
+            <li
+              key={index}
+              className={
+                item.metric_name === polutionType
+                  ? 'ListItem ListItem-active'
+                  : 'ListItem'
+              }
+              onClick={() => handleChange(index)}
+            >
+              {item.metric_name_ru}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
