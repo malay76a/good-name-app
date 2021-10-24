@@ -33,7 +33,7 @@ paths:
     get:
       summary: 'Возвращает данные по станциям, времени и веществам'
       parameters:
-        - name: stantion_id
+        - name: station_id
           in: query
           description: ID станции
           required: false

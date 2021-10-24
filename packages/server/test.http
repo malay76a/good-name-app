@@ -1,15 +1,27 @@
 ### GET request with a header
-GET http://localhost:3000/indicators
+GET http://localhost:3004/indicators
 Accept: application/json
 
 ###
-GET http://localhost:3000/stantions
+GET http://localhost:3004/stantions
 Accept: application/json
 
 ###
-GET http://localhost:3000/data?time=2020-12-28T20:10:00.000Z
+GET http://localhost:3004/data?time=2020-12-31T18:00:00.000Z
 Accept: application/json
 
 ###
-GET http://localhost:3000/timeline
+GET http://localhost:3004/data?time=2020-12-31T18:00:00.000Z&station_id=1
+Accept: application/json
+
+###
+GET http://localhost:3004/data?time=2020-12-31T18:00:00.000Z&station_id=1&metric_name=CO
+Accept: application/json
+
+###
+GET http://localhost:3004/data?time=2020-12-31T18:00:00.000Z&metric_name=CO
+Accept: application/json
+
+###
+GET http://localhost:3004/timeline
 Accept: application/json
