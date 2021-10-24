@@ -1,7 +1,8 @@
 import Dot from '../ListDot';
 import './NormCard.css';
 
-function NormCard() {
+function NormCard({type}) {
+  if(!type) return null;
   return (
     <div className="Card NormCard">
       <ul className="List NormCard-list">

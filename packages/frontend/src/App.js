@@ -1,41 +1,38 @@
-import { YMaps, Map, ZoomControl } from 'react-yandex-maps';
-import NormCard from './NormCard';
 
+import { createContext, useState, useEffect } from 'react';
+
+import NormCard from './NormCard';
 import DataChoice from './DataChoiceCard';
 import BottomData from './BottomData';
+import YaMap from './YaMap';
 import './App.css';
 
+export const AppContext = createContext(null);
+
 function App() {
+  const [station, setStation] = useState('');
+  const [polutionType, setPolutionType] = useState('');
+  useEffect(() => {
+    if(window){
+      fetch('http://localhost:3005/data')
+      //.then(res=>res.json)
+      .then(response => response.json())
+      .then(res=>{
+        console.log(res);
+      })
+      .catch(err=>console.error(err))
+    }
+  }, [])
+
   return (
     <div className="App">
       <div className="App-map-wrapper">
+        <AppContext.Provider value={{station, setStation, polutionType, setPolutionType}}>
         <NormCard />
-
         <DataChoice />
-        <YMaps className="App-map">
-          <Map
-            className="App-map"
-      
-            defaultState={{ center: [55.75, 37.57], zoom: 9, controls: [] }}
-            options={{ maxZoom: 10, minZoom: 1 }}
-          >
-            <ZoomControl
-              options={{
-                position: {
-                  right: 36,
-                  left: 'auto',
-                  top: '50%',
-                  bottom: 'auto',
-                  position: 'absolute',
-                },
-
-                size: 'small',
-              }}
-              state={{ maxZoom: 5, minZoom: 1 }}
-            />
-          </Map>
-        </YMaps>
+        <YaMap />
         <BottomData />
+        </AppContext.Provider>
       </div>
     </div>
   );
