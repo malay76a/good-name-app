@@ -36,7 +36,7 @@ function PolutionList({ stationId, name, ...context }) {
               <span style={{ fontWeight: 'bold' }}>
                 {indicator?.metric_name}
               </span>{' '}
-              - {indicator?.metric_name_ru}
+              - {dataItem?.metric_value}
             </li>
           );
         })}
