@@ -1,9 +1,7 @@
-const db = require('../db');
+const setOfStantions = require('../api/getSetOfStantions');
 
 module.exports = function (req, res) {
-    db
-        .promise()
-        .query('SELECT * FROM production.station_coordinates')
+    setOfStantions()
         .then(([rows]) => {
             const preparedData = rows.map(i => {
                 return {

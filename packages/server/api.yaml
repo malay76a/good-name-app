@@ -42,18 +42,16 @@ paths:
             format: int64
         - name: time
           in: query
-          description: время в UTC
-          required: false
+          description: время в ISO
+          required: true
           schema:
-            type: integer
-            format: int64
-        - name: indicator_id
+            type: string
+        - name: metric_name
           in: query
-          description: ID вещества
+          description: название вещества
           required: false
           schema:
-            type: integer
-            format: int64
+            type: string
       responses:
         '200':
           description: 'Запрос за данными таймлайна'
@@ -74,6 +72,18 @@ paths:
                       data:
                         type: array
                         $ref: '#/components/schemas/Indicator'
+  /timeline:
+    get:
+      summary: 'Возвращает даты для таймлайна'
+      responses:
+        '200':
+          description: 'Запрос за данными таймлайна'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
 components:
   schemas:
     Indicator:
