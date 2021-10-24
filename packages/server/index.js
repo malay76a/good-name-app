@@ -5,7 +5,7 @@ const stantions = require('./routes/stantions');
 const indicators = require('./routes/indicators');
 const data = require('./routes/data');
 
-const port = process.env.PORT || 3000;
+const port =  3004;
 
 app.get('/indicators', indicators);
 app.get('/stantions', stantions);

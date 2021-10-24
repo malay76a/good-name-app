@@ -1,0 +1,38 @@
+
+.SelectCard{
+
+  width: 232px; 
+box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.15);
+border-radius: 4px;
+background: #FFFFFF;
+}
+.Select{
+  position: relative;
+  z-index: 2;
+}
+.Swiper-wrapper{
+  position: relative;
+  z-index: 2;
+}
+ 
+.swiper-slide{
+  display: flex;
+  justify-content: center;
+}
+.swiper-wrapper{
+align-items: center;
+}
+
+.SelectCard .swiper-button-prev,
+.SelectCard .swiper-button-next{
+width: 9px;
+height: 16px;
+margin-top: -8px;
+}
+
+.SelectCard .swiper-button-prev::after,
+.SelectCard .swiper-button-next::after{
+  color: #000;
+  font-size: 16px;
+  font-weight: bold;
+}
