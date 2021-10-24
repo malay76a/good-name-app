@@ -1,6 +1,7 @@
 # good-name-app
 
 Дизайн макеты: https://www.figma.com/file/dqKtGW5qpiSN89fTR2c7ee/Карта-экомониторинга?node-id=0%3A1
+
 Схема: https://miro.com/app/board/o9J_lqfOmgY=/
 
 ### ETL
