@@ -1,0 +1,24 @@
+.Dot{
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 4px;
+}
+
+.Dot-big{
+  width: 12px;
+  height: 12px;
+}
+
+.Dot-norm{
+  background: #70C700;
+}
+
+.Dot-warning{
+  background: #EFD23A;
+  }
+
+.Dot-danger{
+    background: #F24034;
+}
