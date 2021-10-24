@@ -1,9 +1,9 @@
-const setOfIndicators = require('../api/getSetOfIndicators');
+const setForTimeline = require('../api/getSetForTImeline');
 
 module.exports = function (req, res)  {
-    setOfIndicators()
+    setForTimeline()
         .then(([rows]) => {
-            const preparedData = Array.from(new Set(rows.map(i => i['metric_name'])))
+            const preparedData = rows.map(i => i['report_dt'])
             res.setHeader('Content-Type', 'application/json');
             res.send(JSON.stringify(preparedData))
         })

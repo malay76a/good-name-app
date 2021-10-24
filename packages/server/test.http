@@ -9,3 +9,7 @@ Accept: application/json
 ###
 GET http://localhost:3000/data?test=1
 Accept: application/json
+
+###
+GET http://localhost:3000/timeline
+Accept: application/json
