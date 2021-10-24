@@ -1,9 +1,7 @@
-const data = require('../api/getData');
+const pdk = require('../api/getPDK');
 
-module.exports = function (req, res) {
-    const {time, station_id, metric_name} = req.query;
-
-    data(time, station_id, metric_name)
+module.exports = function (req, res)  {
+    pdk()
         .then(([rows]) => {
             res.setHeader('Content-Type', 'application/json');
             res.send(JSON.stringify(rows))

@@ -12,91 +12,19 @@ export const makeUrl = (path) => {
   return `${process.env.REACT_APP_SERVER_URL}/${path}`;
 };
 
-const servData = [
-  {
-  "report_dt": "2019-12-31T18:00:00.000Z",
-  "station_id": 10,
-  "metric_name": "CO",
-  "metric_value": 0.21,
-  "created_at": "2021-10-23T08:09:47.000Z"
-  },
-  {
-  "report_dt": "2019-12-31T18:20:00.000Z",
-  "station_id": 10,
-  "metric_name": "CO",
-  "metric_value": 0.2,
-  "created_at": "2021-10-23T08:09:47.000Z"
-  },
-  {
-  "report_dt": "2019-12-31T18:40:00.000Z",
-  "station_id": 10,
-  "metric_name": "CO",
-  "metric_value": 0.19,
-  "created_at": "2021-10-23T08:09:47.000Z"
-  },
-  {
-  "report_dt": "2019-12-31T19:00:00.000Z",
-  "station_id": 10,
-  "metric_name": "CO",
-  "metric_value": 0.19,
-  "created_at": "2021-10-23T08:09:47.000Z"
-  },
-  {
-  "report_dt": "2019-12-31T19:20:00.000Z",
-  "station_id": 10,
-  "metric_name": "CO",
-  "metric_value": 0.2,
-  "created_at": "2021-10-23T08:09:47.000Z"
-  },
-  {
-  "report_dt": "2019-12-31T19:40:00.000Z",
-  "station_id": 10,
-  "metric_name": "CO",
-  "metric_value": 0.19,
-  "created_at": "2021-10-23T08:09:47.000Z"
-  },
-  {
-  "report_dt": "2019-12-31T20:00:00.000Z",
-  "station_id": 10,
-  "metric_name": "CO",
-  "metric_value": 0.2,
-  "created_at": "2021-10-23T08:09:47.000Z"
-  },
-  {
-  "report_dt": "2019-12-31T20:20:00.000Z",
-  "station_id": 10,
-  "metric_name": "CO",
-  "metric_value": 0.2,
-  "created_at": "2021-10-23T08:09:47.000Z"
-  },
-  {
-  "report_dt": "2019-12-31T20:40:00.000Z",
-  "station_id": 10,
-  "metric_name": "CO",
-  "metric_value": 0.2,
-  "created_at": "2021-10-23T08:09:47.000Z"
-  },
-  {
-  "report_dt": "2019-12-31T21:00:00.000Z",
-  "station_id": 10,
-  "metric_name": "CO",
-  "metric_value": 0.22,
-  "created_at": "2021-10-23T08:09:47.000Z"
-  }
-  ];
-
-  const getFetchData =(path, callback)=>{
-    fetch(makeUrl(path))
+const getFetchData = (path, callback) => {
+  fetch(makeUrl(path))
     .then((response) => response.json())
     .then((res) => {
       callback(res);
     })
     .catch((err) => console.error(err));
-  }
+};
+
 function App() {
   const [station, setStation] = useState('');
-  const [polutionType, setPolutionType] = useState('');
-  const [data, setData] = useState(servData);
+  const [polutionType, setPolutionType] = useState('NO');
+  const [data, setData] = useState([]);
   const [indicators, setIndicators] = useState([]);
   const [stations, setStations] = useState([]);
   const [timelines, setTimelines] = useState([]);
@@ -104,19 +32,20 @@ function App() {
   useEffect(() => {
     if (window) {
       getFetchData('pdk', setIndicators);
-      getFetchData('stantions', setStations);
+      getFetchData('stantions', (stations) =>
+        setStations(stations.filter((item) => item.latitude))
+      );
       getFetchData('timeline', setTimelines);
     }
   }, [window]);
 
-  useEffect(()=>{
-    if(timelines.length){
-      console.log(timelines);
+  useEffect(() => {
+    if (timelines.length) {
       const [time] = timelines;
-      getFetchData(`data?time=${time}`, setData)
+      getFetchData(`data?time=${time}`, setData);
     }
-
   }, [timelines]);
+  const dataReady =  !!(indicators.length && stations.length && data.length);
 
   return (
     <div className="App">
@@ -132,10 +61,11 @@ function App() {
             stations,
           }}
         >
-          <NormCard type={polutionType} indicators={indicators} />
-          <DataChoice indicators={indicators} />
+          <NormCard visible={!!polutionType} />
+
+          {dataReady && <DataChoice />}
           <YaMap />
-          <BottomData />
+          {dataReady && <BottomData />}
         </AppContext.Provider>
       </div>
     </div>

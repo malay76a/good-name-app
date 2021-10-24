@@ -1,4 +1,4 @@
-const db = require("../db");
+const db = require("./db");
 
 module.exports = () => db
     .promise()
@@ -6,7 +6,7 @@ module.exports = () => db
                   sm.station_id,
                   sc.station_name,
                   metric_name
-                FROM filtered.station_metrics sm
+                FROM production.station_metrics sm
                 LEFT JOIN production.station_coordinates sc
                   ON sm.station_id = sc.id
                 WHERE station_id IS NOT NULL

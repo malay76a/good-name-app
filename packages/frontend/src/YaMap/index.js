@@ -1,12 +1,13 @@
-import { useContext, useEffect, useCallback } from 'react';
+import { useContext, useEffect } from 'react';
 import ReactDOMServer from 'react-dom/server';
 
 import { AppContext } from '../App';
 import PolutionList from '../PolutionList';
 
 function YaMap() {
-  const { polutionType, stations, indicators } = useContext(AppContext);
-  const dataReady = stations.length; // !!(indicators.length && stations.length);
+  const context = useContext(AppContext);
+  const { stations, indicators, data } = context;
+  const dataReady =  !!(indicators.length && stations.length && data.length);
 
   const init = () => {
     const findDistance = (firstCoords, secondCoords) => {
@@ -38,32 +39,34 @@ function YaMap() {
       },
       { minZoom: 7 }
     );
-    stations.map((station) => {
-      const { latitude, longitude, name } = station;
+    stations.forEach((station) => {
+      const { latitude, longitude, name, id } = station;
 
-      const markup = ReactDOMServer.renderToStaticMarkup(<PolutionList />);
-      const additionalProps = {
-          preset: 'islands#circleIcon',
-          iconColor: '#3caa3c',
-        };
-      const place = new ymaps.Placemark(
-        [latitude, longitude],
-        {
-          balloonContentHeader: name,
-          balloonContentBody: markup,
-        }
+      const markup = ReactDOMServer.renderToStaticMarkup(
+        <PolutionList stationId={id} {...context} />
       );
+      const additionalProps = {
+        preset: 'islands#circleIcon',
+        iconColor: '#3caa3c',
+      };
+      const place = new ymaps.Placemark([latitude, longitude], {
+        balloonContentHeader: name,
+        balloonContentBody: markup,
+      });
       myMap.geoObjects.add(place);
     });
+    console.log('geoObjects', myMap.geoObjects);
 
     myMap.events.add('click', function (e) {
       if (myMap.baloon?.isOpen()) myMap.baloon.close();
       const currentCoords = e.get('coords');
       const station = findClosestStationByCoords(currentCoords);
 
-      const { name } = station;
-      const markup = ReactDOMServer.renderToStaticMarkup(<PolutionList />);
-
+      const { name, id } = station;
+      const markup = ReactDOMServer.renderToStaticMarkup(
+        <PolutionList stationId={id} {...context} />
+      );
+console.log(markup, context);
       myMap.balloon.open(currentCoords, {
         contentHeader: name,
         contentBody: markup,

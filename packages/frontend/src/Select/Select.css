@@ -1,6 +1,6 @@
 
 .SelectCard{
-width: 232px; 
+width: 252px; 
 box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.15);
 border-radius: 4px;
 background: #FFFFFF;
@@ -12,6 +12,12 @@ background: #FFFFFF;
 .Swiper-wrapper{
   position: relative;
   z-index: 2;
+  font-weight: 500;
+font-size: 14px;
+line-height: 16px;
+padding: 8px 0;
+ 
+cursor: pointer;
 }
  
 .swiper-slide{
@@ -34,4 +40,17 @@ margin-top: -8px;
   color: #000;
   font-size: 16px;
   font-weight: bold;
+}
+.SelectCard .List .ListItem{
+  cursor: pointer;
+  padding: 8px 16px;
+  font-weight: normal;
+font-size: 14px;
+line-height: 16px;
+}
+.SelectCard .List .ListItem-active{
+  font-weight: bold;
+}
+.SelectCard .List{
+  border-top: 2px solid rgba(200, 200, 200, 0.33);
 }
