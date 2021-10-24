@@ -1,14 +1,16 @@
 const db = require("../db");
 
 module.exports = function (req, res) {
-    const {time, stantion_id, metric_name} = res.query;
-    // console.log(res.query)
+    const {time, station_id, metric_name} = req.query;
+    console.log(req.query)
 
     db
         .promise()
         .query(`SELECT * 
                     FROM filtered.station_metrics 
-                    WHERE report_dt = ${time}
+                    WHERE report_dt = "${time}"
+                    ${station_id ? `AND station_id = ${station_id}` : ''}
+                    ${metric_name ? `AND metric_name = "${metric_name}"` : ''}
                     ORDER BY report_dt DESC`)
         .then(([rows]) => {
             res.setHeader('Content-Type', 'application/json');
