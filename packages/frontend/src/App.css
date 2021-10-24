@@ -9,7 +9,7 @@
   font-size: 16px;
   line-height: 19px;
 }
- 
+
 .App-map-wrapper{
   height: 100vh;
   width: 100vw;
@@ -43,6 +43,31 @@
 font-style: normal;
 font-weight: bold;
 font-size: 16px;
- 
+
 margin-bottom: 8px;
+}
+
+.Date-list {
+  font-family: Roboto;
+  height: 300px;
+  position: fixed;
+  top: 160px;
+  left: 20px;
+  z-index: 2;
+  background: #FFFFFF;
+  box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.25);
+  overflow: scroll;
+  list-style: none;
+  padding: 16px;
+  margin: 0;
+  border-radius: 4px;
+}
+
+.Date-list li {
+  cursor: pointer;
+  padding: 8px 4px;
+}
+
+.Date-list li.active {
+  background-color: #ccc;
 }

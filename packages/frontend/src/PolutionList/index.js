@@ -13,7 +13,7 @@ function PolutionList({ stationId, name, ...context }) {
       ? item.metric_name === polutionType
       : true);
   }).filter(i => indicatorsMap[i.metric_name]);
- 
+
   if (!filteredData.length) return null;
 
   return (
@@ -22,7 +22,7 @@ function PolutionList({ stationId, name, ...context }) {
       <ul className={'List'}>
         {filteredData.map((dataItem, index) => {
           const indicator = indicatorsMap[dataItem.metric_name];
- 
+
           if (!indicator) return null;
 
           const getStatus = (pdk, value) => {

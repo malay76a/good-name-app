@@ -28,6 +28,7 @@ function App() {
   const [indicators, setIndicators] = useState([]);
   const [stations, setStations] = useState([]);
   const [timelines, setTimelines] = useState([]);
+  const [selectDate, setSelectDate] = useState('');
 
   useEffect(() => {
     if (window) {
@@ -40,12 +41,23 @@ function App() {
   }, [window]);
 
   useEffect(() => {
-    if (timelines.length) {
-      const [time] = timelines;
-      getFetchData(`data?time=${time}`, setData);
-    }
-  }, [timelines]);
+      if(selectDate) getFetchData(`data?time=${selectDate}`, setData);
+  }, [selectDate]);
+
+  useEffect(() => {
+      if (timelines.length) {
+          const [time] = timelines;
+          setSelectDate(time)
+      }
+  }, [timelines])
+
   const dataReady =  !!(indicators.length && stations.length && data.length);
+
+  const prepereTime = (item) => {
+      const [date, tail] = item.split('T');
+      const [hours, minutes] = tail.split(':');
+      return `${date} ${hours}:${minutes}`
+  }
 
   return (
     <div className="App">
@@ -62,7 +74,9 @@ function App() {
           }}
         >
           <NormCard visible={!!polutionType} />
-
+          <ul className="Date-list">
+              {timelines.map(i => <li className={i === selectDate ? 'active' : ''}  onClick={() => setSelectDate(i)}>{prepereTime(i)}</li>)}
+          </ul>
           {dataReady && <DataChoice />}
           <YaMap />
           {dataReady && <BottomData />}
